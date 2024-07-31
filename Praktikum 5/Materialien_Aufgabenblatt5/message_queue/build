@@ -1,0 +1,2 @@
+gcc -o Client.run Client.c ServerClientMsg.c
+gcc -o Server.run Server.c ServerClientMsg.c

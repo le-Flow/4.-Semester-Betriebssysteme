@@ -1,0 +1,81 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+
+#define MAX_ATTEMPTS 5
+
+int attempts = 0;
+pid_t child_pid;
+
+// Signal Handlers
+void handle_sigusr1(int sig) {
+    if (sig == SIGUSR1) {
+        char msg[] = "Ich habe die Aufgaben bekommen\n";
+        write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+
+        // Simulate doing homework
+        sleep(1);
+
+        char msg_done[] = "Ich mache meine Aufgaben...\nIch bin fertig. Ich schick Dir meine Aufgaben.\n";
+        write(STDOUT_FILENO, msg_done, sizeof(msg_done) - 1);
+
+        kill(getppid(), SIGUSR2);
+    }
+}
+
+void handle_sigusr2(int sig) {
+    if (sig == SIGUSR2) {
+        char msg[] = "Ich habe deine Lösungen erhalten\n";
+        write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+
+        // Simulate checking homework
+        sleep(1);
+
+        if (attempts < MAX_ATTEMPTS) {
+            attempts++;
+            char msg_check[] = "Ich kontrolliere Deine Aufgaben...\nDeine Aufgaben sind falsch.\nIch schicke Dir neue Aufgaben\n";
+            write(STDOUT_FILENO, msg_check, sizeof(msg_check) - 1);
+
+            kill(child_pid, SIGUSR1);
+        } else {
+            char msg_final[] = "Ich kontrolliere Deine Aufgaben...\nDeine Aufgaben sind falsch.\nJetzt reichts. Geh raus!\n";
+            write(STDOUT_FILENO, msg_final, sizeof(msg_final) - 1);
+
+            kill(child_pid, SIGKILL);
+            exit(0);
+        }
+    }
+}
+
+int main() {
+    signal(SIGUSR1, handle_sigusr1);
+    signal(SIGUSR2, handle_sigusr2);
+
+    if ((child_pid = fork()) == 0) {
+        // Child process
+        char msg[] = "Ich bin der Kindprozess\n";
+        write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+
+        while (1) {
+            pause();  // Wait for signals
+        }
+    } else {
+        // Parent process
+        char msg[] = "Ich bin der Vaterprozess\n";
+        write(STDOUT_FILENO, msg, sizeof(msg) - 1);
+
+        sleep(1);
+        char msg_start[] = "Ich schicke Dir neue Aufgaben\n";
+        write(STDOUT_FILENO, msg_start, sizeof(msg_start) - 1);
+        kill(child_pid, SIGUSR1);
+
+        while (1) {
+            pause();  // Wait for signals
+        }
+    }
+
+    return 0;
+}

@@ -1,0 +1,70 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+#define MAX_CUSTOMERS 75
+#define MAX_IN_STORE 15
+#define MAX_ARRIVAL_RATE 20
+#define MIN_STAY_TIME 1
+#define MAX_STAY_TIME 5
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+
+int customers_in_store = 0;
+int waiting_customers = 0;
+
+void* customer(void* arg) {
+    int id = *((int*)arg);
+    int stay_time = (rand() % (MAX_STAY_TIME - MIN_STAY_TIME + 1)) + MIN_STAY_TIME;
+
+    pthread_mutex_lock(&mutex);
+
+    if (customers_in_store < MAX_IN_STORE) {
+        customers_in_store++;
+        printf("Kunde %d betritt das Möbelhaus. Kunden im Geschäft: %d\n", id, customers_in_store);
+        pthread_mutex_unlock(&mutex);
+        sleep(stay_time);
+        pthread_mutex_lock(&mutex);
+        customers_in_store--;
+        printf("Kunde %d verlässt das Möbelhaus. Kunden im Geschäft: %d\n", id, customers_in_store);
+    } else {
+        if (waiting_customers < MAX_CUSTOMERS) {
+            waiting_customers++;
+            printf("Kunde %d wartet in der Schlange vor dem Möbelhaus.\n", id);
+            pthread_cond_wait(&cond, &mutex);
+            waiting_customers--;
+            printf("Kunde %d betritt das Möbelhaus aus der Warteschlange. Kunden im Geschäft: %d\n", id, customers_in_store);
+            pthread_mutex_unlock(&mutex);
+            sleep(stay_time);
+            pthread_mutex_lock(&mutex);
+            customers_in_store--;
+            printf("Kunde %d verlässt das Möbelhaus. Kunden im Geschäft: %d\n", id, customers_in_store);
+        } else {
+            printf("Kunde %d kommt zum Möbelhaus, aber kann nicht eintreten und geht weg.\n", id);
+        }
+    }
+
+    pthread_mutex_unlock(&mutex);
+    pthread_exit(NULL);
+}
+
+int main() {
+    srand(time(NULL));
+
+    pthread_t threads[MAX_CUSTOMERS];
+    int customer_ids[MAX_CUSTOMERS];
+
+    for (int i = 0; i < MAX_CUSTOMERS; i++) {
+        customer_ids[i] = i + 1;
+        pthread_create(&threads[i], NULL, customer, &customer_ids[i]);
+        usleep((rand() % (MAX_ARRIVAL_RATE + 1)) * 1000000); // Random delay for customer arrival
+    }
+
+    for (int i = 0; i < MAX_CUSTOMERS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    return 0;
+}
